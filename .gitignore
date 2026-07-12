@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.log
+.env
+.DS_Store
+
+# Local-dev slip fallback (prod uses Supabase Storage)
+server/uploads/
+# Legacy local SQLite (pre-Supabase)
+server/data/
