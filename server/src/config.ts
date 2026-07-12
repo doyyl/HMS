@@ -5,10 +5,35 @@ import dotenv from 'dotenv';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
+const nodeEnv = process.env.NODE_ENV ?? 'development';
+const isProduction = nodeEnv === 'production';
+
+const DEFAULT_JWT_SECRET = 'hms-dev-secret-change-me';
+const jwtSecret = process.env.JWT_SECRET ?? DEFAULT_JWT_SECRET;
+
+// Fail fast: never boot production on the shared dev secret.
+if (isProduction && (jwtSecret === DEFAULT_JWT_SECRET || jwtSecret.length < 16)) {
+  throw new Error(
+    'JWT_SECRET must be set to a strong, non-default value (>=16 chars) in production.',
+  );
+}
+
+// Comma-separated allowlist of browser origins. Empty in dev = reflect any origin.
+const corsOrigins = (process.env.CORS_ORIGINS ?? '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 export const config = {
+  nodeEnv,
+  isProduction,
   port: Number(process.env.PORT ?? 4000),
-  jwtSecret: process.env.JWT_SECRET ?? 'hms-dev-secret-change-me',
+  jwtSecret,
   jwtExpiresIn: '12h',
+  corsOrigins,
+
+  // Public base URL of this deployment (used for payment return URLs later).
+  publicBaseUrl: process.env.PUBLIC_BASE_URL ?? `http://localhost:${process.env.PORT ?? 4000}`,
 
   // Postgres connection string (Supabase pooler in prod, local PG in dev).
   databaseUrl: process.env.DATABASE_URL ?? 'postgres://postgres@127.0.0.1:5432/hms',

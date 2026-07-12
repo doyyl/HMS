@@ -22,6 +22,15 @@ export default {
       boxShadow: {
         card: '0 1px 2px rgba(15,42,48,0.06), 0 8px 24px -12px rgba(15,42,48,0.25)',
       },
+      keyframes: {
+        fadeIn: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+      },
+      animation: {
+        fadeIn: 'fadeIn .15s ease-out',
+      },
     },
   },
   plugins: [],

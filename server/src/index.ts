@@ -1,11 +1,15 @@
-import express, { type ErrorRequestHandler } from 'express';
-import cors from 'cors';
+import express, { type ErrorRequestHandler, type RequestHandler } from 'express';
+import cors, { type CorsOptions } from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { pinoHttp } from 'pino-http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ZodError } from 'zod';
 import { config } from './config.js';
-import { applySchema } from './db/index.js';
+import { applySchema, closePool } from './db/index.js';
 import { ApiError } from './util/http.js';
+import { logger } from './util/logger.js';
 
 import { authRouter } from './routes/auth.js';
 import { roomsRouter } from './routes/rooms.js';
@@ -24,13 +28,47 @@ import { usersRouter } from './routes/users.js';
 await applySchema();
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// Behind a proxy (Supabase/Render/Nginx) — trust X-Forwarded-* so rate-limit
+// and secure cookies see the real client IP.
+app.set('trust proxy', 1);
+
+// Structured request logging with per-request ids.
+app.use(pinoHttp({ logger }));
+
+// Security headers. CSP is disabled here because the SPA + external payment
+// redirects need a bespoke policy; helmet's other defaults still apply.
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// CORS: allowlist in production, reflect any origin in dev.
+const corsOptions: CorsOptions = {
+  origin: config.corsOrigins.length > 0 ? config.corsOrigins : true,
+  credentials: true,
+};
+app.use(cors(corsOptions));
+
+app.use(express.json({ limit: '1mb' }));
+
+// Rate limiters. Strict on auth (brute-force), moderate on public endpoints.
+const authLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'พยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอสักครู่' },
+});
+const publicLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'คำขอบ่อยเกินไป กรุณารอสักครู่' },
+});
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
 
-app.use('/api/auth', authRouter);
-app.use('/api/public', publicRouter);
+app.use('/api/auth', authLimiter, authRouter);
+app.use('/api/public', publicLimiter, publicRouter);
 app.use('/api/rooms', roomsRouter);
 app.use('/api/bookings', bookingsRouter);
 app.use('/api/products', productsRouter);
@@ -42,6 +80,12 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/users', usersRouter);
 
+// Unmatched API routes return JSON 404 (not the SPA fallback below).
+const apiNotFound: RequestHandler = (_req, res) => {
+  res.status(404).json({ error: 'ไม่พบรายการที่ต้องการ' });
+};
+app.use('/api', apiNotFound);
+
 // Serve the built SPA in production (web/dist), with client-side routing fallback.
 const webDist = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'web', 'dist');
 if (fs.existsSync(webDist)) {
@@ -50,20 +94,37 @@ if (fs.existsSync(webDist)) {
 }
 
 // Centralised error handler with Thai-friendly messages.
-const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
+const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   if (err instanceof ApiError) {
     res.status(err.status).json({ error: err.message });
     return;
   }
   if (err instanceof ZodError) {
-    res.status(400).json({ error: 'ข้อมูลไม่ถูกต้อง', details: err.flatten() });
+    // Only expose field-level details outside production.
+    const body: { error: string; details?: unknown } = { error: 'ข้อมูลไม่ถูกต้อง' };
+    if (!config.isProduction) body.details = err.flatten();
+    res.status(400).json(body);
     return;
   }
-  console.error(err);
+  req.log.error({ err }, 'unhandled error');
   res.status(500).json({ error: 'เกิดข้อผิดพลาดในระบบ' });
 };
 app.use(errorHandler);
 
-app.listen(config.port, () => {
-  console.log(`HMS server listening on http://0.0.0.0:${config.port}`);
+const server = app.listen(config.port, () => {
+  logger.info(`HMS server listening on http://0.0.0.0:${config.port}`);
 });
+
+// Graceful shutdown: stop accepting connections, then drain the pg pool.
+async function shutdown(signal: string): Promise<void> {
+  logger.info(`${signal} received — shutting down`);
+  server.close(async () => {
+    await closePool();
+    logger.info('shutdown complete');
+    process.exit(0);
+  });
+  // Force-exit if connections do not drain in time.
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+process.on('SIGTERM', () => void shutdown('SIGTERM'));
+process.on('SIGINT', () => void shutdown('SIGINT'));
