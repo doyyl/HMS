@@ -41,6 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    // Best-effort audit; the token is discarded regardless of the result.
+    api.post('/auth/logout').catch(() => {});
     setToken(null);
     setUser(null);
     window.location.href = '/login';

@@ -42,7 +42,7 @@ export async function buildReport(period: Period, date: string): Promise<ReportR
     `SELECT
        COALESCE(SUM(CASE WHEN method='cash' THEN amount END),0) AS cash,
        COALESCE(SUM(CASE WHEN method='qr'   THEN amount END),0) AS qr
-     FROM payments WHERE ${f.clause('created_at')}`,
+     FROM payments WHERE status = 'normal' AND ${f.clause('created_at')}`,
     [f.param],
   ))!;
 

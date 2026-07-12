@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../util/http.js';
+import { all } from '../db/index.js';
+import { getAllSettings } from '../repositories/settings.js';
 import {
   checkIn,
   extendShortStay,
@@ -35,6 +37,27 @@ bookingsRouter.get(
   '/:id/folio',
   asyncHandler(async (req, res) => {
     res.json(await getFolio(Number(req.params.id)));
+  }),
+);
+
+// Receipt data: folio + non-voided payments + hotel identity (for printing).
+bookingsRouter.get(
+  '/:id/receipt',
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    const folio = await getFolio(id);
+    const settings = await getAllSettings();
+    const payments = await all<{ id: number; amount: number; method: string; receipt_type: string; created_at: Date }>(
+      "SELECT id, amount, method, receipt_type, created_at FROM payments WHERE booking_id = ? AND status = 'normal' ORDER BY id",
+      [id],
+    );
+    res.json({
+      ...folio,
+      hotel: { name: settings.HOTEL_NAME ?? 'โรงแรม', address: settings.HOTEL_ADDRESS ?? '' },
+      payments,
+      paidTotal: payments.reduce((s, p) => s + p.amount, 0),
+      issuedAt: new Date(),
+    });
   }),
 );
 

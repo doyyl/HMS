@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { get } from '../db/index.js';
+import { get, run } from '../db/index.js';
 import { signToken, requireAuth, type AuthUser } from '../middleware/auth.js';
-import { asyncHandler, unauthorized } from '../util/http.js';
+import { asyncHandler, badRequest, unauthorized } from '../util/http.js';
+import { audit } from '../util/audit.js';
 
 export const authRouter = Router();
 
@@ -32,3 +33,34 @@ authRouter.post(
 authRouter.get('/me', requireAuth, (req, res) => {
   res.json({ user: req.user });
 });
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8, 'รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร'),
+});
+
+authRouter.post(
+  '/change-password',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
+    const row = await get<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = ?', [req.user!.id]);
+    if (!row || !bcrypt.compareSync(currentPassword, row.password_hash)) {
+      throw badRequest('รหัสผ่านปัจจุบันไม่ถูกต้อง');
+    }
+    const hash = bcrypt.hashSync(newPassword, 10);
+    await run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, req.user!.id]);
+    await audit(req.user!.id, 'password_change', 'user', req.user!.id);
+    res.json({ ok: true });
+  }),
+);
+
+// JWT is stateless; logout just records an audit entry. The client discards the token.
+authRouter.post(
+  '/logout',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    await audit(req.user!.id, 'logout', 'user', req.user!.id);
+    res.json({ ok: true });
+  }),
+);

@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import fs from 'node:fs';
 import { z } from 'zod';
-import { run } from '../db/index.js';
-import { requireAuth } from '../middleware/auth.js';
+import { all, get, run } from '../db/index.js';
+import { requireAuth, requireManager } from '../middleware/auth.js';
 import { uploadSlip } from '../middleware/upload.js';
-import { asyncHandler, badRequest } from '../util/http.js';
+import { asyncHandler, badRequest, notFound } from '../util/http.js';
 import { getCurrentShift } from '../services/shift.js';
 import { getReceiptTypes } from '../repositories/settings.js';
 import { putSlip, slipUrl, localSlipPath } from '../services/storage.js';
@@ -39,6 +39,58 @@ paymentsRouter.post(
     );
     await audit(req.user!.id, 'payment', 'payment', Number(r.rows[0]!.id), `${input.method} ${input.amount}`);
     res.status(201).json({ id: Number(r.rows[0]!.id), slip: slipKey });
+  }),
+);
+
+// Payments recorded in the current open shift (for reconciliation / voiding).
+paymentsRouter.get(
+  '/current-shift',
+  asyncHandler(async (_req, res) => {
+    const shift = await getCurrentShift();
+    if (!shift) return res.json({ payments: [] });
+    const payments = await all<{
+      id: number;
+      amount: number;
+      method: string;
+      status: string;
+      booking_id: number | null;
+      room_label: string | null;
+      created_at: Date;
+    }>(
+      `SELECT p.id, p.amount, p.method, p.status, p.booking_id, r.label AS room_label, p.created_at
+       FROM payments p
+       LEFT JOIN bookings b ON b.id = p.booking_id
+       LEFT JOIN rooms r ON r.id = b.room_id
+       WHERE p.shift_id = ? ORDER BY p.id DESC`,
+      [shift.id],
+    );
+    res.json({ payments });
+  }),
+);
+
+// Void a payment (manager-only). Voided payments drop out of shift
+// reconciliation and revenue reports but remain on record with an audit trail.
+const voidSchema = z.object({ reason: z.string().trim().max(200).optional() });
+paymentsRouter.post(
+  '/:id/void',
+  requireManager,
+  asyncHandler(async (req, res) => {
+    const id = Number(req.params.id);
+    const reason = voidSchema.parse(req.body ?? {}).reason ?? null;
+    const p = await get<{ id: number; status: string; amount: number; method: string }>(
+      'SELECT id, status, amount, method FROM payments WHERE id = ?',
+      [id],
+    );
+    if (!p) throw notFound('ไม่พบรายการชำระเงิน');
+    if (p.status === 'voided') throw badRequest('รายการนี้ถูกยกเลิกแล้ว');
+    await run("UPDATE payments SET status = 'voided', voided_by = ?, voided_at = ?, void_reason = ? WHERE id = ?", [
+      req.user!.id,
+      new Date(),
+      reason,
+      id,
+    ]);
+    await audit(req.user!.id, 'payment_void', 'payment', id, `${p.method} ${p.amount}${reason ? ' · ' + reason : ''}`);
+    res.json({ ok: true });
   }),
 );
 

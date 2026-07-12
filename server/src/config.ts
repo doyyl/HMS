@@ -63,4 +63,6 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   EARLY_CHECKOUT_HOUR: '18',
   EARLY_CHECKIN_FEE: '50',
   RECEIPT_TYPES: 'none,receipt,invoice',
+  HOTEL_NAME: 'โรงแรม',
+  HOTEL_ADDRESS: '',
 };

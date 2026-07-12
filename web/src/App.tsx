@@ -10,6 +10,7 @@ import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { Users } from './pages/Users';
 import { CustomerOrder } from './pages/CustomerOrder';
+import { Receipt } from './pages/Receipt';
 import type { ReactNode } from 'react';
 
 function Protected({ children, managerOnly }: { children: ReactNode; managerOnly?: boolean }) {
@@ -25,6 +26,14 @@ export function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/order/:token" element={<CustomerOrder />} />
+      <Route
+        path="/receipt/:bookingId"
+        element={
+          <Protected>
+            <Receipt />
+          </Protected>
+        }
+      />
       <Route
         element={
           <Protected>

@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { api } from '../lib/api';
+import { ChangePasswordModal } from './ChangePasswordModal';
 import type { CustomerOrder } from '../lib/types';
 
 const NAV = [
@@ -18,6 +19,7 @@ export function Layout() {
   const { user, logout, isManager } = useAuth();
   const [pending, setPending] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [showChangePw, setShowChangePw] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -71,9 +73,14 @@ export function Layout() {
       <div className="border-t border-bone/10 px-5 py-4">
         <div className="text-sm font-semibold">{user?.displayName}</div>
         <div className="mb-3 text-xs text-bone/50">{isManager ? 'ผู้จัดการ' : 'พนักงาน'}</div>
-        <button onClick={logout} className="text-xs text-bone/70 underline hover:text-bone">
-          ออกจากระบบ
-        </button>
+        <div className="flex flex-col items-start gap-2">
+          <button onClick={() => setShowChangePw(true)} className="text-xs text-bone/70 underline hover:text-bone">
+            เปลี่ยนรหัสผ่าน
+          </button>
+          <button onClick={logout} className="text-xs text-bone/70 underline hover:text-bone">
+            ออกจากระบบ
+          </button>
+        </div>
       </div>
     </>
   );
@@ -129,6 +136,8 @@ export function Layout() {
       <main className="flex-1 overflow-x-hidden bg-bone pt-14 md:pt-0">
         <Outlet />
       </main>
+
+      {showChangePw && <ChangePasswordModal onClose={() => setShowChangePw(false)} />}
     </div>
   );
 }

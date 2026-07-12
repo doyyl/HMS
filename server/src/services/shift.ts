@@ -34,15 +34,15 @@ export async function getShiftSummary(shiftId: number): Promise<ShiftSummary> {
   const shift = await get<ShiftRow>('SELECT * FROM shifts WHERE id = ?', [shiftId]);
   if (!shift) throw notFound('ไม่พบกะการทำงาน');
   const cash = (await get<{ t: string }>(
-    "SELECT COALESCE(SUM(amount),0) AS t FROM payments WHERE shift_id = ? AND method = 'cash'",
+    "SELECT COALESCE(SUM(amount),0) AS t FROM payments WHERE shift_id = ? AND method = 'cash' AND status = 'normal'",
     [shiftId],
   ))!;
   const qr = (await get<{ t: string }>(
-    "SELECT COALESCE(SUM(amount),0) AS t FROM payments WHERE shift_id = ? AND method = 'qr'",
+    "SELECT COALESCE(SUM(amount),0) AS t FROM payments WHERE shift_id = ? AND method = 'qr' AND status = 'normal'",
     [shiftId],
   ))!;
   const missing = (await get<{ n: string }>(
-    "SELECT COUNT(*) AS n FROM payments WHERE shift_id = ? AND method = 'qr' AND (slip_image_path IS NULL OR slip_image_path = '')",
+    "SELECT COUNT(*) AS n FROM payments WHERE shift_id = ? AND method = 'qr' AND status = 'normal' AND (slip_image_path IS NULL OR slip_image_path = '')",
     [shiftId],
   ))!;
   return {

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { baht, dateTimeOf } from '../lib/format';
+import { baht, dateTimeOf, timeOf } from '../lib/format';
 import { ErrorNote } from '../components/Modal';
-import type { ShiftSummary } from '../lib/types';
+import type { ShiftSummary, ShiftPayment } from '../lib/types';
 
 export function CashDrawer() {
   const { isManager } = useAuth();
@@ -11,6 +11,7 @@ export function CashDrawer() {
     shift: null,
     summary: null,
   });
+  const [payments, setPayments] = useState<ShiftPayment[]>([]);
   const [openFloat, setOpenFloat] = useState(0);
   const [floatEdit, setFloatEdit] = useState(0);
   const [closeCount, setCloseCount] = useState(0);
@@ -25,7 +26,16 @@ export function CashDrawer() {
         setFloatEdit(r.shift?.opening_float ?? 0);
       })
       .catch(() => {});
+    api
+      .get<{ payments: ShiftPayment[] }>('/payments/current-shift')
+      .then((r) => setPayments(r.payments))
+      .catch(() => {});
   }, []);
+
+  async function voidPayment(id: number) {
+    const reason = window.prompt('เหตุผลในการยกเลิกรายการชำระเงิน (ไม่บังคับ)') ?? undefined;
+    await act(() => api.post(`/payments/${id}/void`, reason ? { reason } : undefined));
+  }
 
   useEffect(() => {
     load();
@@ -122,6 +132,42 @@ export function CashDrawer() {
               >
                 ปิดกะ
               </button>
+            </div>
+
+            <div className="card space-y-2 p-6">
+              <h2 className="text-lg font-bold">รายการชำระเงินในกะนี้</h2>
+              {payments.length === 0 ? (
+                <p className="text-sm text-ink/40">ยังไม่มีการชำระเงิน</p>
+              ) : (
+                <ul className="divide-y divide-ink/5">
+                  {payments.map((p) => {
+                    const voided = p.status === 'voided';
+                    return (
+                      <li key={p.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                        <div className={voided ? 'text-ink/40 line-through' : ''}>
+                          <span className="font-semibold">{baht(p.amount)}</span>
+                          <span className="ml-2 text-ink/50">{p.method === 'cash' ? 'เงินสด' : 'QR'}</span>
+                          {p.room_label && <span className="ml-2 text-ink/40">ห้อง {p.room_label}</span>}
+                          <span className="ml-2 text-xs text-ink/30">{timeOf(p.created_at)}</span>
+                        </div>
+                        {voided ? (
+                          <span className="text-xs font-semibold text-red-500">ยกเลิกแล้ว</span>
+                        ) : (
+                          isManager && (
+                            <button
+                              className="min-h-[36px] rounded-md px-3 text-xs font-semibold text-red-600 hover:bg-red-50"
+                              disabled={busy}
+                              onClick={() => voidPayment(p.id)}
+                            >
+                              ยกเลิก
+                            </button>
+                          )
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </div>
         )}

@@ -157,6 +157,14 @@ export function ManageBooking({
             <button className="btn-accent" onClick={() => setPaying(true)} disabled={busy}>
               รับชำระ &amp; เช็คเอาท์ · {baht(folio.grandTotal)}
             </button>
+            <a
+              className="btn-outline text-center text-sm"
+              href={`/receipt/${bookingId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              พิมพ์ใบเสร็จ
+            </a>
             <button
               className="btn-ghost text-sm text-red-600"
               onClick={() => {

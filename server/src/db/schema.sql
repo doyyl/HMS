@@ -151,6 +151,17 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at);
 CREATE INDEX IF NOT EXISTS idx_payments_shift ON payments(shift_id);
 
+-- Void support (idempotent — safe to re-run on an existing DB).
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS status      TEXT NOT NULL DEFAULT 'normal';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS voided_by   INTEGER REFERENCES users(id);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS voided_at   TIMESTAMPTZ;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS void_reason TEXT;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'payments_status_check') THEN
+    ALTER TABLE payments ADD CONSTRAINT payments_status_check CHECK (status IN ('normal', 'voided'));
+  END IF;
+END $$;
+
 -- ---------------------------------------------------------------------------
 -- Settings + audit
 -- ---------------------------------------------------------------------------

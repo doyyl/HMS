@@ -76,6 +76,23 @@ export interface ShiftSummary {
   expectedCash: number;
 }
 
+export interface ShiftPayment {
+  id: number;
+  amount: number;
+  method: 'cash' | 'qr';
+  status: 'normal' | 'voided';
+  booking_id: number | null;
+  room_label: string | null;
+  created_at: string;
+}
+
+export interface ReceiptData extends Folio {
+  hotel: { name: string; address: string };
+  payments: Array<{ id: number; amount: number; method: string; receipt_type: string; created_at: string }>;
+  paidTotal: number;
+  issuedAt: string;
+}
+
 export interface CustomerOrder {
   id: number;
   status: string;
