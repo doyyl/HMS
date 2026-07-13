@@ -7,6 +7,7 @@ import type { CustomerOrder } from '../lib/types';
 
 const NAV = [
   { to: '/', label: 'ผังห้องพัก', icon: '▦', end: true },
+  { to: '/reservations', label: 'การจองล่วงหน้า', icon: '📅' },
   { to: '/orders', label: 'คำสั่งซื้อจากลูกค้า', icon: '🔔', badge: true },
   { to: '/pos', label: 'ขายสินค้า', icon: '🛒' },
   { to: '/cash', label: 'เงินสด / กะ', icon: '💵' },

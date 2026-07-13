@@ -22,6 +22,7 @@ import { shiftsRouter } from './routes/shifts.js';
 import { reportsRouter } from './routes/reports.js';
 import { settingsRouter } from './routes/settings.js';
 import { usersRouter } from './routes/users.js';
+import { reservationsRouter } from './routes/reservations.js';
 
 /** Build the Express app (no listening, no schema apply — safe for tests). */
 export function createApp(): Express {
@@ -82,6 +83,7 @@ export function createApp(): Express {
   app.use('/api/reports', reportsRouter);
   app.use('/api/settings', settingsRouter);
   app.use('/api/users', usersRouter);
+  app.use('/api/reservations', reservationsRouter);
 
   // Unmatched API routes return JSON 404 (not the SPA fallback below).
   const apiNotFound: RequestHandler = (_req, res) => {

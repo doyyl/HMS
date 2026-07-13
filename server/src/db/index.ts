@@ -15,7 +15,9 @@ async function makeDriver(): Promise<Driver> {
   // Tests run against an in-process Postgres (pglite) — no external server needed.
   if (config.nodeEnv === 'test') {
     const { PGlite } = await import('@electric-sql/pglite');
-    const db = new PGlite();
+    // Return DATE (OID 1082) as a raw 'YYYY-MM-DD' string, not a Date, to avoid
+    // timezone-shift bugs when the value crosses the JSON boundary.
+    const db = new PGlite({ parsers: { 1082: (v: string) => v } });
     return {
       async query(sql, params) {
         const res = await db.query(sql, params as unknown[]);
@@ -25,6 +27,10 @@ async function makeDriver(): Promise<Driver> {
       end: () => db.close(),
     };
   }
+
+  // Return DATE (OID 1082) as a raw 'YYYY-MM-DD' string (node-pg otherwise
+  // parses it to a local-midnight Date, which shifts a day under Asia/Bangkok).
+  pg.types.setTypeParser(1082, (v) => v);
 
   // Supabase's pooler and most managed PGs require TLS. Local dev PG does not;
   // enable SSL only for non-localhost hosts.
@@ -85,6 +91,10 @@ export async function applySchema(): Promise<void> {
   const d = await getDriver();
   const schema = fs.readFileSync(config.schemaPath, 'utf-8');
   await d.exec(schema);
+  // btree_gist EXCLUDE constraint is real-Postgres only (pglite lacks it).
+  if (config.nodeEnv !== 'test' && fs.existsSync(config.schemaPgPath)) {
+    await d.exec(fs.readFileSync(config.schemaPgPath, 'utf-8'));
+  }
 }
 
 export async function closePool(): Promise<void> {

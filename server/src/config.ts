@@ -46,6 +46,8 @@ export const config = {
 
   uploadsDir: process.env.UPLOADS_DIR ?? path.join(__dirname, '..', 'uploads'),
   schemaPath: path.join(__dirname, 'db', 'schema.sql'),
+  // Real-Postgres-only DDL (btree_gist EXCLUDE). Skipped under the pglite test driver.
+  schemaPgPath: path.join(__dirname, 'db', 'schema.pg.sql'),
 } as const;
 
 // Default pricing/time constants. Seeded into the settings table and editable
@@ -65,4 +67,8 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   RECEIPT_TYPES: 'none,receipt,invoice',
   HOTEL_NAME: 'โรงแรม',
   HOTEL_ADDRESS: '',
+  // Minutes an unpaid online reservation holds a room before auto-expiring.
+  RESERVATION_HOLD_MINUTES: '15',
+  // Hour (Bangkok) after the arrival day at which a confirmed no-show is flagged.
+  NO_SHOW_HOUR: '14',
 };

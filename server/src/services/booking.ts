@@ -56,6 +56,17 @@ export async function checkIn(input: CheckInInput): Promise<BookingRow> {
   if (room.status !== 'available') throw conflict(`ห้อง ${room.label} ไม่ว่าง`);
   if (room.cleaning_status !== 'clean') throw conflict(`ห้อง ${room.label} ยังไม่ได้ทำความสะอาด`);
 
+  // Don't let a walk-in steal a room that is reserved for today. Staff should
+  // check the reservation in from the Reservations screen instead.
+  const reserved = await get<{ id: number }>(
+    `SELECT id FROM reservations
+      WHERE room_id = ? AND status IN ('confirmed', 'pending_payment')
+        AND check_in_date <= now()::date AND check_out_date > now()::date
+      LIMIT 1`,
+    [input.roomId],
+  );
+  if (reserved) throw conflict(`ห้อง ${room.label} มีการจองไว้แล้ววันนี้ — กรุณาเช็คอินจากรายการจอง`);
+
   const now = new Date();
   let baseAmount: number;
   let earlyFee = 0;

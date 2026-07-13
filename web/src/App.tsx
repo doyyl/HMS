@@ -6,6 +6,7 @@ import { RoomBoard } from './pages/RoomBoard';
 import { Pos } from './pages/Pos';
 import { OrderQueue } from './pages/OrderQueue';
 import { CashDrawer } from './pages/CashDrawer';
+import { Reservations } from './pages/Reservations';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { Users } from './pages/Users';
@@ -42,6 +43,7 @@ export function App() {
         }
       >
         <Route path="/" element={<RoomBoard />} />
+        <Route path="/reservations" element={<Reservations />} />
         <Route path="/pos" element={<Pos />} />
         <Route path="/orders" element={<OrderQueue />} />
         <Route path="/cash" element={<CashDrawer />} />

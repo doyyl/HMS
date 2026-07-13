@@ -76,6 +76,30 @@ export interface ShiftSummary {
   expectedCash: number;
 }
 
+export interface AvailableRoom {
+  id: number;
+  building: string;
+  number: number;
+  label: string;
+}
+
+export interface Reservation {
+  id: number;
+  code: string;
+  room_id: number;
+  room_label: string;
+  check_in_date: string;
+  check_out_date: string;
+  nights: number;
+  guest_name: string;
+  guest_phone: string;
+  guest_email: string | null;
+  amount: number;
+  status: 'pending_payment' | 'confirmed' | 'checked_in' | 'completed' | 'cancelled' | 'expired' | 'no_show';
+  booking_id: number | null;
+  source: 'online' | 'phone' | 'walkin';
+}
+
 export interface ShiftPayment {
   id: number;
   amount: number;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { baht, timeOf, untilLabel } from '../lib/format';
 import { Modal } from '../components/Modal';
@@ -10,6 +11,17 @@ export function RoomBoard() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [checkInRoom, setCheckInRoom] = useState<Room | null>(null);
   const [manageBookingId, setManageBookingId] = useState<number | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // A reservation check-in redirects here with the new booking id to open.
+  useEffect(() => {
+    const openBooking = (location.state as { openBooking?: number } | null)?.openBooking;
+    if (openBooking) {
+      setManageBookingId(openBooking);
+      navigate('.', { replace: true, state: null });
+    }
+  }, [location.state, navigate]);
 
   const load = useCallback(() => {
     api.get<{ rooms: Room[] }>('/rooms').then((r) => setRooms(r.rooms)).catch(() => {});
