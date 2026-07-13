@@ -14,10 +14,18 @@ let driver: Driver | null = null;
 async function makeDriver(): Promise<Driver> {
   // Tests run against an in-process Postgres (pglite) — no external server needed.
   if (config.nodeEnv === 'test') {
-    const { PGlite } = await import('@electric-sql/pglite');
+    // Non-literal specifier + local typing so production bundlers (Vercel/esbuild)
+    // don't try to bundle or type-resolve this dev-only dependency.
+    const pglitePkg = '@electric-sql/pglite';
+    interface PGliteLike {
+      query(sql: string, params: unknown[]): Promise<{ rows: unknown[]; affectedRows?: number }>;
+      exec(sql: string): Promise<unknown>;
+      close(): Promise<void>;
+    }
+    const mod = (await import(pglitePkg)) as { PGlite: new (opts?: unknown) => PGliteLike };
     // Return DATE (OID 1082) as a raw 'YYYY-MM-DD' string, not a Date, to avoid
     // timezone-shift bugs when the value crosses the JSON boundary.
-    const db = new PGlite({ parsers: { 1082: (v: string) => v } });
+    const db = new mod.PGlite({ parsers: { 1082: (v: string) => v } });
     return {
       async query(sql, params) {
         const res = await db.query(sql, params as unknown[]);
