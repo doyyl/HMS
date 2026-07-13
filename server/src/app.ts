@@ -8,6 +8,7 @@ import path from 'node:path';
 import { ZodError } from 'zod';
 import { config } from './config.js';
 import { ping } from './db/index.js';
+import { sweepReservations } from './services/reservation.js';
 import { ApiError } from './util/http.js';
 import { logger } from './util/logger.js';
 
@@ -77,6 +78,21 @@ export function createApp(): Express {
       res.json({ ok: true, db: 'up', time: new Date().toISOString() });
     } catch {
       res.status(503).json({ ok: false, db: 'down', time: new Date().toISOString() });
+    }
+  });
+
+  // Reservation sweep — invoked by Vercel Cron (replaces the setInterval on
+  // always-on hosts). Protected by CRON_SECRET when set.
+  app.get('/api/cron/sweep', async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (secret && req.headers.authorization !== `Bearer ${secret}`) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    try {
+      await sweepReservations();
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ error: 'sweep failed' });
     }
   });
 
