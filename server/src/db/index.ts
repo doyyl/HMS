@@ -97,6 +97,12 @@ export async function applySchema(): Promise<void> {
   }
 }
 
+/** Liveness check: resolves if the database answers a trivial query. */
+export async function ping(): Promise<void> {
+  const d = await getDriver();
+  await d.query('SELECT 1', []);
+}
+
 export async function closePool(): Promise<void> {
   if (driver) await driver.end();
   driver = null;

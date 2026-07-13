@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ZodError } from 'zod';
 import { config } from './config.js';
+import { ping } from './db/index.js';
 import { ApiError } from './util/http.js';
 import { logger } from './util/logger.js';
 
@@ -69,7 +70,15 @@ export function createApp(): Express {
     app.use('/api/public', publicLimiter);
   }
 
-  app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+  // Deep health check: verifies the database is reachable (for load balancers).
+  app.get('/api/health', async (_req, res) => {
+    try {
+      await ping();
+      res.json({ ok: true, db: 'up', time: new Date().toISOString() });
+    } catch {
+      res.status(503).json({ ok: false, db: 'down', time: new Date().toISOString() });
+    }
+  });
 
   app.use('/api/auth', authRouter);
   app.use('/api/public', publicRouter);

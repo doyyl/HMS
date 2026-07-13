@@ -73,17 +73,85 @@ Each room has a rotating `order_token`. Print a QR pointing at
 `http://<lan-ip>:4000/order/<token>` and place it in the room. Orders only work
 while the room has an active booking; they land in **คำสั่งซื้อจากลูกค้า** for staff to accept.
 
+## Progressive Web App (PWA) & mobile
+
+The web app is installable and responsive. On a phone, staff get a hamburger
+drawer; the sidebar shows on tablet/desktop. "Add to Home Screen" installs it as
+a standalone app. `/api/*` is always fetched from the network (never served from
+the cache) so POS data is never stale — the app shell is precached for fast loads.
+
 ## Tests
 
 ```bash
-npm test            # pricing engine unit tests (vitest, runs under TZ=Asia/Bangkok)
+npm test            # unit (pricing) + integration (API) — vitest, TZ=Asia/Bangkok
 ```
+
+Integration tests run against an in-process Postgres (**pglite**) — no database
+setup required. They cover auth, the booking lifecycle, shift/payment void
+reconciliation, order accept/reject, and the reservation flow.
+
+End-to-end (Playwright) runs against a live dev stack:
+
+```bash
+cd web && npm i -D @playwright/test && npx playwright install
+npm run dev            # from repo root (server :4000 + web :5173)
+npm run seed           # once, to seed rooms/users/products
+cd web && npm run test:e2e
+```
+
+## Reservations (advance booking)
+
+Staff can take phone reservations under **การจองล่วงหน้า**: pick a date range,
+the app shows rooms free for the whole span, and confirmed reservations appear in
+an "arrivals today" panel. Checking a reservation in creates a normal booking, so
+checkout / folio / in-room ordering all work unchanged. A background sweep expires
+unpaid holds and flags no-shows. Online guest booking + 2C2P prepayment is the
+next phase (see `.env.example` `TWOC2P_*`).
+
+## Deployment
+
+Single-process deploy: the server serves the built SPA from `web/dist` and the
+API on the same port.
+
+```bash
+cp server/.env.example server/.env   # fill DATABASE_URL, JWT_SECRET, CORS_ORIGINS, PUBLIC_BASE_URL
+npm ci
+npm run start:prod                   # builds web, then runs the server with NODE_ENV=production
+```
+
+Production requirements:
+
+- **`NODE_ENV=production`** — the server refuses to boot on the default/weak
+  `JWT_SECRET`. Set a strong secret (≥16 chars).
+- **`CORS_ORIGINS`** — comma-separated allowlist of the browser origin(s).
+- **`DATABASE_URL`** — Supabase transaction pooler (SSL auto-enabled for non-local hosts).
+
+Run under a process manager so it restarts on crash/reboot. PM2:
+
+```bash
+npm run build
+pm2 start "npm run start --workspace server" --name hms --update-env
+pm2 save && pm2 startup
+```
+
+Or systemd (`/etc/systemd/system/hms.service`): run `npm run start --workspace
+server` in `WorkingDirectory=/opt/hms` with `Environment=NODE_ENV=production`
+and `EnvironmentFile=/opt/hms/server/.env`, `Restart=always`.
+
+- **Health check:** `GET /api/health` returns `200 {ok:true,db:"up"}` and `503`
+  if the database is unreachable — point your load balancer / uptime monitor at it.
+- **Graceful shutdown:** `SIGTERM`/`SIGINT` stop new connections and drain the DB pool.
+- **Backups:** database lives in Supabase (managed daily backups; enable PITR for
+  finer recovery). Slip images are in the private Supabase Storage bucket.
+- **Schema:** applied idempotently on boot; the `btree_gist` overlap constraint
+  (double-booking guard) is applied only against real Postgres.
 
 ## Configuration
 
 Pricing and time constants live in the `settings` table and are editable by a
 manager under **ตั้งค่า**. Server settings via env (see `.env.example`): `PORT`,
-`JWT_SECRET`, `DB_PATH`, `UPLOADS_DIR`.
+`NODE_ENV`, `JWT_SECRET`, `DATABASE_URL`, `CORS_ORIGINS`, `PUBLIC_BASE_URL`,
+`SUPABASE_*`, `UPLOADS_DIR`.
 
 ## Notes / tradeoffs
 
