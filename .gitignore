@@ -9,3 +9,4 @@ dist/
 server/uploads/
 # Legacy local SQLite (pre-Supabase)
 server/data/
+.vercel

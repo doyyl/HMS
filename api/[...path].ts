@@ -6,7 +6,7 @@
 process.env.TZ = process.env.TZ || 'Asia/Bangkok';
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-// @ts-expect-error — built JS has no d.ts; resolved at Vercel build time.
+// @ts-ignore — built JS has no d.ts; resolved at Vercel build time.
 import { createApp } from '../server/dist/app.js';
 
 const app = createApp();

@@ -8,6 +8,6 @@
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/cron/sweep", "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/sweep", "schedule": "0 1 * * *" }
   ]
 }

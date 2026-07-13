@@ -3,7 +3,7 @@
 process.env.TZ = process.env.TZ || 'Asia/Bangkok';
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-// @ts-expect-error — built JS has no d.ts; resolved at Vercel build time.
+// @ts-ignore — built JS has no d.ts; resolved at Vercel build time.
 import { sweepReservations } from '../../server/dist/services/reservation.js';
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
